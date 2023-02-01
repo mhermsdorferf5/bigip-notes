@@ -8,7 +8,7 @@
 # tcpdump captures can be taken directly, capturing the tls sessionid & secret out of TMM
 # See: https://support.f5.com/csp/article/K31793632
 
-when CLIENT_ADDEPTED {
+when CLIENT_ACCEPTED {
   # Be sure to set the test client ip here:
   set testClientIP "192.0.2.1"
 }
