@@ -8,14 +8,19 @@
 # tcpdump captures can be taken directly, capturing the tls sessionid & secret out of TMM
 # See: https://support.f5.com/csp/article/K31793632
 
+when CLIENT_ADDEPTED {
+  # Be sure to set the test client ip here:
+  set testClientIP "192.0.2.1"
+}
+
 when CLIENTSSL_HANDSHAKE {
-  if { [IP::addr [getfield [IP::client_addr] "%" 1] equals <client_IP_addr>] } {
+  if { [IP::addr [getfield [IP::client_addr] "%" 1] equals ${testClientIP}] } {
     log local0. "[TCP::client_port] :: RSA Session-ID:[SSL::sessionid] Master-Key:[SSL::sessionsecret]"
   }
 }
 
 when SERVERSSL_HANDSHAKE {
-  if { [IP::addr [getfield [IP::client_addr] "%" 1] equals <client_IP_addr>] } {
+  if { [IP::addr [getfield [IP::client_addr] "%" 1] equals ${testClientIP}] } {
     log local0. "[TCP::client_port] :: RSA Session-ID:[SSL::sessionid] Master-Key:[SSL::sessionsecret]"
   }
 }
