@@ -1,7 +1,8 @@
 ################################################################################
 ################################################################################
 # SNAT based on source address from data-group
-# Create a data-group with 
+# Create a data-group with the subnets to snat:
+# tmsh create ltm data-group internal /Common/subnets_to_snat_dg type ip records replace-all-with { 10.53.24.0/24 10.53.28.0/22 10.53.48.0/22 }
 
 when CLIENT_ACCEPTED {
     # Set the name of the data-group containing IPs/Subnets to SNAT:
@@ -10,7 +11,7 @@ when CLIENT_ACCEPTED {
     # IF the data-group exists
     if { [class exists ${subnets_to_snat_dg}]} {
         # Check if the Client IP is within the data-group:
-        if { [class match [IP::client_addr] equals ${subnets_to_snat_dg}]} {
+        if { [class match [getfield [IP::client_addr] "%" 1] equals ${subnets_to_snat_dg}]} {
             # SNAT the traffic:
             snat automap 
             # Note you can also snat to a specific ip and/or snatpool.
