@@ -1,4 +1,3 @@
-ltm rule /Common/http_transparent_to_explicit_proxy {
 when CLIENT_ACCEPTED priority 50 {
 
     ## Debug logging:
@@ -307,5 +306,4 @@ when SERVER_DATA priority 900 {
         }
     }
     TCP::release
-}
 }
