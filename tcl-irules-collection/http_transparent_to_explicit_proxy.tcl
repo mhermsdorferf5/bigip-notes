@@ -4,7 +4,7 @@ when CLIENT_ACCEPTED priority 50 {
     ## Debug logging:
     # 1 = Enable debug logging (DO NOT USE IN PRODUCTION)
     # 0 = Disable debug logging.
-    set debug 1
+    set debug 0
 }
 ###################################################
 ######## NO CUSTOMIZATION BELOW THIS LINE #########
@@ -12,7 +12,8 @@ when CLIENT_ACCEPTED priority 50 {
 
 when CLIENT_ACCEPTED priority 250 {
 
-if { $debug } { set ctx(log) 1 } else { set ctx(log) 0}
+# Debug  is log level 2, normal reject logging with log level 1, set ctx(log) 0 to stop all logging.:
+if { $debug } { set ctx(log) 2 } else { set ctx(log) 1}
 set srcIP [IP::client_addr]
 set dstIP [IP::local_addr]
 set srcPort [TCP::client_port]
@@ -24,7 +25,7 @@ set ctx(xpinfo) ""
 if {[set x [lsearch -integer -sorted [list 21 22 25 53 80 110 115 143 443 465 587 990 993 995 3128 8080] [TCP::local_port]]] >= 0} {
    set ctx(ptcl) [lindex [list "ftp" "ssh" "smtp" "dns" "http" "pop3" "sftp" "imap" "https" "smtps" "smtp" "ftps" "imaps" "pop3s" "http" "http"] $x]
 }
-if { $ctx(log) } { log local0.debug "CLIENT_ACCEPTED TCP from ${srcIP}:${srcPort} to ${dstIP}:${dstPort} L7 guess=$ctx(ptcl) ExplicitProxy=${ctx(xpinfo)}" }
+if { $ctx(log) > 1 } { log local0.debug "CLIENT_ACCEPTED TCP from ${srcIP}:${srcPort} to ${dstIP}:${dstPort} L7 guess=$ctx(ptcl) ExplicitProxy=${ctx(xpinfo)}" }
 
 } ; #CLIENT_ACCEPTED
 
@@ -51,7 +52,7 @@ when CLIENT_DATA priority 500 {
         ## fetch SNI from client rule (sharedvar)
         set SNI ${SEND_SNI}
     } else {
-        if { $ctx(log) } { log local0.debug "no SNI from client, do binary scan!" }
+        if { $ctx(log) > 1 } { log local0.debug "no SNI from client, do binary scan!" }
         ## no SNI provided, binary parse TLS ClientHello (22) to get SNI
         binary scan [TCP::payload] c type
         if { ${type} == 22 } {
@@ -81,7 +82,7 @@ when CLIENT_DATA priority 500 {
             }
 
             if { ($detect_handshake) } {
-                if { $ctx(log) } { log local0.debug "TLS Handshake Detected." }
+                if { $ctx(log) > 1 } { log local0.debug "TLS Handshake Detected." }
                 # skip past the session id
                 set record_offset 43
                 binary scan [TCP::payload] @${record_offset}c tls_sessidlen
@@ -97,7 +98,7 @@ when CLIENT_DATA priority 500 {
 
                 # check for the existence of ssl extensions
                 if { ([TCP::payload length] > $record_offset) } {
-                    if { $ctx(log) } { log local0.debug "SSL Extensions Found." }
+                    if { $ctx(log) > 1 } { log local0.debug "SSL Extensions Found." }
                     # skip to the start of the first extension
                     binary scan [TCP::payload] @${record_offset}S tls_extenlen
                     set record_offset [expr {$record_offset + 2}]
@@ -148,15 +149,32 @@ when CLIENT_DATA priority 500 {
             set px_connect "CONNECT ${SNI}:[TCP::local_port] HTTP/1.1\r\n\r\n"
 
             # Send the CONNECT
-            if { $ctx(log) } { log local0.debug "replacing payload with CONNECT command: ${px_connect}" }
+            if { $ctx(log) > 1 } { log local0.debug "replacing payload with CONNECT command: ${px_connect}" }
             TCP::payload replace 0 0 $px_connect
             TCP::release
-            if { $ctx(log) } { log local0.debug "released payload" }
+            if { $ctx(log) > 1 } { log local0.debug "released payload" }
         } elseif { ${SNI} eq "" } {
-            ## HTTPS proxy chaining must fail without an SNI
-            if { $ctx(log) } {  log local0.debug "reject for lack of SNI." } 
-            reject
-            return
+            ## IF there is no SNI extension, then assume we're connecting to the IP.
+            set option 1
+
+            ## Store the original payload (would normally be the client TLS handshake)
+            binary scan [TCP::payload] H* orig
+
+            ## Point the traffic to the proxy server
+            pool ${THIS_POOL}
+
+            # Drop the client handshake
+            TCP::payload replace 0 [TCP::payload length] ""
+
+            # Form up the CONNECT call
+            ## Given No SNI extension, then assume we're connecting to the IP.
+            set px_connect "CONNECT [TCP::local_addr]:[TCP::local_port] HTTP/1.1\r\n\r\n"
+
+            # Send the CONNECT
+            if { $ctx(log) > 1 } { log local0.debug "replacing payload with CONNECT command: ${px_connect}" }
+            TCP::payload replace 0 0 $px_connect
+            TCP::release
+            if { $ctx(log) > 1 } { log local0.debug "released payload" }
         }
          } elseif { $ctx(ptcl) eq "http" } {
              ## Enable HTTP processing
@@ -169,7 +187,7 @@ when CLIENT_DATA priority 500 {
          }
 }
 when HTTP_REQUEST priority 500 {
-    if { $ctx(log) } { log local0.debug "Firing HTTP_REQUEST on server irule" }
+    if { $ctx(log) > 1 } { log local0.debug "Firing HTTP_REQUEST on server irule" }
     if { [HTTP::header exists Host] } {
         set http_hostname [HTTP::host]
     } else {
@@ -183,7 +201,7 @@ when HTTP_REQUEST priority 500 {
     HTTP::uri http://${http_hostname}:[TCP::local_port][HTTP::uri]
 }
 when HTTP_RESPONSE priority 300 {
-    if { $ctx(log) } { log local0.debug "Firing HTTP_RESPONSE on server irule" }
+    if { $ctx(log) > 1 } { log local0.debug "Firing HTTP_RESPONSE on server irule" }
     switch -glob -- [HTTP::status] {
         "2*" -
         "3*" {
@@ -191,41 +209,41 @@ when HTTP_RESPONSE priority 300 {
         }
         "400" {
             # Bad Request
-            if { $ctx(log) } { log local0.debug "reject for http 400" }
+            if { $ctx(log) } { log local0.debug "reject for http 400 from proxy" }
             #reject
             #return
         }
         "403" {
             # Forbidden
-            if { $ctx(log) } { log local0.debug "reject for http 403" }
+            if { $ctx(log) } { log local0.debug "reject for http 403 from proxy" }
            # reject
            # return
         }
         "407" {
-            if { $ctx(log) } { log local0.debug "407 response from proxy replace with 401" }
+            if { $ctx(log) > 1 } { log local0.debug "407 response from proxy replace with 401 from proxy" }
             # stub for when authentication is required
             HTTP::header replace ":S" "401 Unauthorized"
         }
         "502" {
             # Bad Gateway (proxy error)
-            if { $ctx(log) } { log local0.debug "reject for http 502" }
+            if { $ctx(log) } { log local0.debug "reject for http 502 from proxy" }
            # reject
            # return
         }
         "503" {
             # Service Unavailable
-            if { $ctx(log) } { log local0.debug "reject for http 503" }
+            if { $ctx(log) } { log local0.debug "reject for http 503 from proxy" }
            # reject
            # return
         }
         "504" {
             # Gateway Timeout
-            if { $ctx(log) } { log local0.debug "reject for http 504" }
+            if { $ctx(log) } { log local0.debug "reject for http 504 from proxy" }
            # reject
            # return
         }
         default {
-            if { $ctx(log) } { log local0.debug "catchall reject" }
+            if { $ctx(log) } { log local0.debug "catchall reject from proxy" }
            # reject
            # return
         }
@@ -234,56 +252,56 @@ when HTTP_RESPONSE priority 300 {
 when SERVER_CONNECTED priority 900 {
     ## Only do this for TLS traffic
     if { ${option} } {
-        if { $ctx(log) } { log local0.debug "Option TCP Collection on SERVER_CONNECTED" }
+        if { $ctx(log) > 1 } { log local0.debug "Option TCP Collection on SERVER_CONNECTED" }
         TCP::collect 12
     }
 }
 when SERVER_DATA priority 900 {
     switch -glob -- [TCP::payload] {
         "HTTP/1.[01] 200*" {
-            if { $ctx(log) } { log local0.debug "SERVER_DATA replay SSL Client Hello: ${orig}" }
+            if { $ctx(log) > 1 } { log local0.debug "SERVER_DATA replay SSL Client Hello: ${orig}" }
             # drop the proxy status and replay the original handshake
             TCP::payload replace 0 [TCP::payload length] ""
             TCP::respond [binary format H* $orig]
         }
         "HTTP/1.[01] 400*" {
             # Bad Request
-            if { $ctx(log) } { log local0.debug "reject for http 400" }
+            if { $ctx(log) } { log local0.debug "reject for http 400 from proxy" }
            # reject
            # return
         }
         "HTTP/1.[01] 403*" {
             # Forbidden
-            if { $ctx(log) } { log local0.debug "reject for http 403" }
+            if { $ctx(log) } { log local0.debug "reject for http 403 from proxy" }
            # reject
            # return
         }
         "HTTP/1.[01] 407*" {
             # stub for when authentication is required
-            if { $ctx(log) } { log local0.debug "reject for http 407" }
+            if { $ctx(log) } { log local0.debug "reject for http 407 from proxy" }
            # reject
         #    return
         }
         "HTTP/1.[01] 502*" {
             # Bad Gateway (proxy error)
-            if { $ctx(log) } { log local0.debug "reject for http 502" }
+            if { $ctx(log) } { log local0.debug "reject for http 502 from proxy" }
         #    reject
         #    return
         }
         "HTTP/1.[01] 503*" {
             # Service Unavailable
-            if { $ctx(log) } { log local0.debug "reject for http 503" }
+            if { $ctx(log) } { log local0.debug "reject for http 503 from proxy" }
         #    reject
         #    return
         }
         "HTTP/1.[01] 504*" {
             # Gateway Timeout
-            if { $ctx(log) } { log local0.debug "reject for http 504" }
+            if { $ctx(log) } { log local0.debug "reject for http 504 from proxy" }
         #    reject
         #    return
         }
         default {
-            if { $ctx(log) } { log local0.debug "catchall reject" }
+            if { $ctx(log) } { log local0.debug "catchall reject from proxy" }
         #    reject
         #    return
         }
