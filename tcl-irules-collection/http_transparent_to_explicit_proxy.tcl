@@ -20,6 +20,7 @@ set dstPort [TCP::local_port]
 set ctx(SNI) ""
 set ctx(ptcl) "unknown"
 set ctx(xpinfo) ""
+set SNI ""
 
 if {[set x [lsearch -integer -sorted [list 21 22 25 53 80 110 115 143 443 465 587 990 993 995 3128 8080] [TCP::local_port]]] >= 0} {
    set ctx(ptcl) [lindex [list "ftp" "ssh" "smtp" "dns" "http" "pop3" "sftp" "imap" "https" "smtps" "smtp" "ftps" "imaps" "pop3s" "http" "http"] $x]
@@ -167,7 +168,7 @@ when CLIENT_DATA priority 500 {
 
             # Form up the CONNECT call
             ## Given No SNI extension, then assume we're connecting to the IP.
-            set px_connect "CONNECT [TCP::local_addr]:[TCP::local_port] HTTP/1.1\r\n\r\n"
+            set px_connect "CONNECT [IP::local_addr]:[TCP::local_port] HTTP/1.1\r\n\r\n"
 
             # Send the CONNECT
             if { $ctx(log) > 1 } { log local0.debug "replacing payload with CONNECT command: ${px_connect}" }
