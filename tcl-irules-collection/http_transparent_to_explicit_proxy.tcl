@@ -3,7 +3,7 @@ when CLIENT_ACCEPTED priority 50 {
     ## Debug logging:
     # 1 = Enable debug logging (DO NOT USE IN PRODUCTION)
     # 0 = Disable debug logging.
-    set debug 1
+    set debug 0
 }
 ###################################################
 ######## NO CUSTOMIZATION BELOW THIS LINE #########
@@ -22,7 +22,7 @@ set ctx(ptcl) "unknown"
 set ctx(xpinfo) ""
 set SNI ""
 # Setup Log Prefix:
-if { $ctx(log) } { 
+if { $ctx(log) >= 1 } { 
     set logPrefix "$srcIP:$srcPort => $dstIP:$dstPort "
 }
 
@@ -79,9 +79,15 @@ when CLIENT_DATA priority 500 {
                 reject
                 return
             }
+            
+            if { ![info exists tls_version] } {
+                log local0.warn "$logPrefix TLS Version not parsed from handshake"
+                set tls_version ""
+            }
 
             if { $ctx(log) > 1} { log local0.debug "$logPrefix TLS Version detected: ${tls_version} TLS Record Length: $tls_recordlen" }
-
+            
+            
             switch -- $tls_version {
                 "769" -
                 "770" -
@@ -91,6 +97,10 @@ when CLIENT_DATA priority 500 {
                         # We have a TLS handshake, now check if it's a clienthello (handshake type = 1):
                         binary scan [TCP::payload] @5c tls_handshake_type
                         # If the handshake type is 1 & we don't have the full tls record length, we should wait.
+                        if { ![info exists tls_handshake_type] } {
+                           log local0.warn "$logPrefix TLS handshake type not parsed from handshake"
+                           set tls_handshake_type ""
+                        }
                         if { $tls_handshake_type == 1 && [TCP::payload length] < $tls_recordlen } {
                             if { $ctx(log) > 1 } { log local0.debug "$logPrefix WARNING: Handshake Detected, but full TLS Record NOT in TCP payload." }
                             # If we don't, then we need try and wait for it...
