@@ -66,23 +66,23 @@ when CLIENT_DATA priority 500 {
     } else {
         if { $ctx(log) > 1 } { log local0.debug "$logPrefix no SNI from client, do binary scan!" }
         ## no SNI provided, binary parse TLS ClientHello (22) to get SNI
+        set type ""
         binary scan [TCP::payload] c type
         if { ${type} == 22 } {
             set option 1
 
             ## Store the original payload
+            set orig ""
             binary scan [TCP::payload] H* orig
 
             ## Check for a properly formatted handshake request
+            set tls_xacttype ""
+            set tls_version ""
+            set tls_recordlen ""
             if { [binary scan [TCP::payload] cSS tls_xacttype tls_version tls_recordlen] < 3 } {
-                if { $ctx(log) } { log local0.debug "$logPrefix reject for bad tls version/record length" }
+                if { $ctx(log) } { log local0.notice "$logPrefix reject for bad tls version/record length" }
                 reject
                 return
-            }
-            
-            if { ![info exists tls_version] } {
-                log local0.warn "$logPrefix TLS Version not parsed from handshake"
-                set tls_version ""
             }
 
             if { $ctx(log) > 1} { log local0.debug "$logPrefix TLS Version detected: ${tls_version} TLS Record Length: $tls_recordlen" }
@@ -95,12 +95,9 @@ when CLIENT_DATA priority 500 {
                     if { $ctx(log) > 1 } { log local0.debug "TLS Exchange Type: ${tls_xacttype}" }
                     if { ($tls_xacttype == 22) } {
                         # We have a TLS handshake, now check if it's a clienthello (handshake type = 1):
+                        set tls_handshake_type ""
                         binary scan [TCP::payload] @5c tls_handshake_type
                         # If the handshake type is 1 & we don't have the full tls record length, we should wait.
-                        if { ![info exists tls_handshake_type] } {
-                           log local0.warn "$logPrefix TLS handshake type not parsed from handshake"
-                           set tls_handshake_type ""
-                        }
                         if { $tls_handshake_type == 1 && [TCP::payload length] < $tls_recordlen } {
                             if { $ctx(log) > 1 } { log local0.debug "$logPrefix WARNING: Handshake Detected, but full TLS Record NOT in TCP payload." }
                             # If we don't, then we need try and wait for it...
@@ -118,7 +115,7 @@ when CLIENT_DATA priority 500 {
                             }
                             if { [TCP::payload length] < $tls_recordlen  } {
                                 set detect_handshake 0
-                                if { $ctx(log) } { log local0.debug "$logPrefix ERROR: Client Hello Handshake Detected, but full TLS Record NOT in TCP payload, even after waiting for: [expr {$loop_time * $loop_count}]" }
+                                if { $ctx(log) } { log local0.notice "$logPrefix ERROR: Client Hello Handshake Detected, but full TLS Record NOT in TCP payload, even after waiting for: [expr {$loop_time * $loop_count}]" }
                             } else {
                                 if { $ctx(log) > 1 } { log local0.debug "$logPrefix Client Hello Handshake Detected, full TLS Record collected after waiting for: [expr {$loop_time * $loop_count}]" }
                                 set detect_handshake 1
@@ -134,14 +131,17 @@ when CLIENT_DATA priority 500 {
                 if { $ctx(log) > 1 } { log local0.debug "$logPrefix TLS Handshake Detected." }
                 # skip past the session id
                 set record_offset 43
+                set tls_sessidlen ""
                 binary scan [TCP::payload] @${record_offset}c tls_sessidlen
                 set record_offset [expr {$record_offset + 1 + $tls_sessidlen}]
 
                 # skip past the cipher list
+                set tls_ciphlen ""
                 binary scan [TCP::payload] @${record_offset}S tls_ciphlen
                 set record_offset [expr {$record_offset + 2 + $tls_ciphlen}]
 
                 # skip past the compression list
+                set tls_complen ""
                 binary scan [TCP::payload] @${record_offset}c tls_complen
                 set record_offset [expr {$record_offset + 1 + $tls_complen}]
 
@@ -149,18 +149,23 @@ when CLIENT_DATA priority 500 {
                 if { ([TCP::payload length] > $record_offset) } {
                     if { $ctx(log) > 1 } { log local0.debug "$logPrefix SSL Extensions Found." }
                     # skip to the start of the first extension
+                    set tls_extenlen ""
                     binary scan [TCP::payload] @${record_offset}S tls_extenlen
                     set record_offset [expr {$record_offset + 2}]
                     # read all the extensions into a variable
+                    set tls_extensions ""
                     binary scan [TCP::payload] @${record_offset}a* tls_extensions
 
                     # for each extension
                     for { set ext_offset 0 } { $ext_offset < $tls_extenlen } { incr ext_offset 4 } {
+                        set etype ""
+                        set elen ""
                         binary scan $tls_extensions @${ext_offset}SS etype elen
                         if { ($etype == 0) } {
                             # if it's a servername extension read the servername
                             set grabstart [expr {$ext_offset + 9}]
                             set grabend [expr {$elen - 5}]
+                            set tls_servername_orig ""
                             binary scan $tls_extensions @${grabstart}A${grabend} tls_servername_orig
                             set tls_servername [string tolower ${tls_servername_orig}]
                             set ext_offset [expr {$ext_offset + $elen}]
@@ -172,7 +177,7 @@ when CLIENT_DATA priority 500 {
                     }
                 }
             } else {
-                if { $ctx(log) } { log local0.debug "$logPrefix WARNING: No TLS Handshake Detected, traffic falling through iRule." }
+                if { $ctx(log) } { log local0.notice "$logPrefix WARNING: No TLS Handshake Detected, traffic falling through iRule." }
             }
             if { [info exists tls_servername] } {
                 set SNI ${tls_servername}
@@ -189,6 +194,7 @@ when CLIENT_DATA priority 500 {
             set option 1
 
             ## Store the original payload (would normally be the client TLS handshake)
+            set orig ""
             binary scan [TCP::payload] H* orig
 
             ## Point the traffic to the proxy server
@@ -211,6 +217,7 @@ when CLIENT_DATA priority 500 {
             set option 1
 
             ## Store the original payload (would normally be the client TLS handshake)
+            set orig ""
             binary scan [TCP::payload] H* orig
 
             ## Point the traffic to the proxy server
@@ -234,7 +241,7 @@ when CLIENT_DATA priority 500 {
              HTTP::enable
              TCP::release
          } else {
-             if { $ctx(log) } { log local0.debug "$logPrefix catchall reject" }
+             if { $ctx(log) } { log local0.notice "$logPrefix catchall reject" }
              reject
              return
          }
@@ -262,41 +269,41 @@ when HTTP_RESPONSE priority 300 {
         }
         "400" {
             # Bad Request
-            if { $ctx(log) } { log local0.debug "$logPrefix reject for http 400 from proxy" }
+            if { $ctx(log) } { log local0.notice "$logPrefix reject for http 400 from proxy" }
             #reject
             #return
         }
         "403" {
             # Forbidden
-            if { $ctx(log) } { log local0.debug "$logPrefix reject for http 403 from proxy" }
+            if { $ctx(log) } { log local0.notice "$logPrefix reject for http 403 from proxy" }
            # reject
            # return
         }
         "407" {
-            if { $ctx(log) > 1 } { log local0.debug "$logPrefix 407 response from proxy replace with 401 from proxy" }
+            if { $ctx(log) } { log local0.notice "$logPrefix 407 response from proxy replace with 401 from proxy" }
             # stub for when authentication is required
             HTTP::header replace ":S" "401 Unauthorized"
         }
         "502" {
             # Bad Gateway (proxy error)
-            if { $ctx(log) } { log local0.debug "$logPrefix reject for http 502 from proxy" }
+            if { $ctx(log) } { log local0.notice "$logPrefix reject for http 502 from proxy" }
            # reject
            # return
         }
         "503" {
             # Service Unavailable
-            if { $ctx(log) } { log local0.debug "$logPrefix reject for http 503 from proxy" }
+            if { $ctx(log) } { log local0.notice "$logPrefix reject for http 503 from proxy" }
            # reject
            # return
         }
         "504" {
             # Gateway Timeout
-            if { $ctx(log) } { log local0.debug "$logPrefix reject for http 504 from proxy" }
+            if { $ctx(log) } { log local0.notice "$logPrefix reject for http 504 from proxy" }
            # reject
            # return
         }
         default {
-            if { $ctx(log) } { log local0.debug "$logPrefix catchall reject from proxy" }
+            if { $ctx(log) } { log local0.notice "$logPrefix catchall reject from proxy" }
            # reject
            # return
         }
@@ -315,46 +322,49 @@ when SERVER_DATA priority 900 {
             if { $ctx(log) > 1 } { log local0.debug "$logPrefix SERVER_DATA replay SSL Client Hello: ${orig}" }
             # drop the proxy status and replay the original handshake
             TCP::payload replace 0 [TCP::payload length] ""
-            TCP::respond [binary format H* $orig]
+            # Attempt to send the payload (orig tls handshake), but catch in case we lost connection or such.
+            if { [catch [TCP::respond [binary format H* $orig]] ]} {
+                if { $ctx(log) } { log local0.warning "Replay of TLS Handshake failed, likely connection to proxy dropped, error code: $::errorCode error info: $::errorInfo" }
+            }   
         }
         "HTTP/1.[01] 400*" {
             # Bad Request
-            if { $ctx(log) } { log local0.debug "$logPrefix reject for http 400 from proxy" }
+            if { $ctx(log) } { log local0.notice "$logPrefix reject for http 400 from proxy" }
            # reject
            # return
         }
         "HTTP/1.[01] 403*" {
             # Forbidden
-            if { $ctx(log) } { log local0.debug "$logPrefix reject for http 403 from proxy" }
+            if { $ctx(log) } { log local0.notice "$logPrefix reject for http 403 from proxy" }
            # reject
            # return
         }
         "HTTP/1.[01] 407*" {
             # stub for when authentication is required
-            if { $ctx(log) } { log local0.debug "$logPrefix reject for http 407 from proxy" }
+            if { $ctx(log) } { log local0.notice "$logPrefix reject for http 407 from proxy" }
            # reject
         #    return
         }
         "HTTP/1.[01] 502*" {
             # Bad Gateway (proxy error)
-            if { $ctx(log) } { log local0.debug "$logPrefix reject for http 502 from proxy" }
+            if { $ctx(log) } { log local0.notice "$logPrefix reject for http 502 from proxy" }
         #    reject
         #    return
         }
         "HTTP/1.[01] 503*" {
             # Service Unavailable
-            if { $ctx(log) } { log local0.debug "$logPrefix reject for http 503 from proxy" }
+            if { $ctx(log) } { log local0.notice "$logPrefix reject for http 503 from proxy" }
         #    reject
         #    return
         }
         "HTTP/1.[01] 504*" {
             # Gateway Timeout
-            if { $ctx(log) } { log local0.debug "$logPrefix reject for http 504 from proxy" }
+            if { $ctx(log) } { log local0.notice "$logPrefix reject for http 504 from proxy" }
         #    reject
         #    return
         }
         default {
-            if { $ctx(log) } { log local0.debug "$logPrefix catchall reject from proxy" }
+            if { $ctx(log) } { log local0.notice "$logPrefix catchall reject from proxy" }
         #    reject
         #    return
         }
