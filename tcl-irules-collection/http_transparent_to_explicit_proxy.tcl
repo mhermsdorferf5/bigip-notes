@@ -102,22 +102,24 @@ when CLIENT_DATA priority 500 {
                             if { $ctx(log) > 1 } { log local0.debug "$logPrefix WARNING: Handshake Detected, but full TLS Record NOT in TCP payload." }
                             # If we don't, then we need try and wait for it...
                             # loop_time controls how long each count through the loop waits, in milliseconds.
-                            set loop_time 5
+                            set loop_time 2
                             # max_loop_count controls how many times we'll wait, total delay could be: $loop_time * $max_loop_count
-                            # in this case, total max wait time is: 5*1000 = 5000ms or 5 seconds.
-                            set max_loop_count 1000
+                            # in this case, total max wait time is: 2*2500 = 5000ms or 5 seconds.
+                            set max_loop_count 2500
                             set loop_count 0
-                            while { $loop_count < $max_loop_count }{ 
-                                incr loop_count
+                            while { $loop_count < $max_loop_count }{
                                 if { $ctx(log) > 1 } { log local0.debug "$logPrefix TLS Record Length: $tls_recordlen | TCP Payload size: [TCP::payload length] | Loop Counter: $loop_count" }
                                 if { [TCP::payload length] >= $tls_recordlen } { break }
                                 after $loop_time
+                                incr loop_count
                             }
                             if { [TCP::payload length] < $tls_recordlen  } {
                                 set detect_handshake 0
-                                if { $ctx(log) } { log local0.notice "$logPrefix ERROR: Client Hello Handshake Detected, but full TLS Record NOT in TCP payload, even after waiting for: [expr {$loop_time * $loop_count}]" }
+                                if { $ctx(log) } { 
+                                    log local0.warning "$logPrefix ERROR: Client Hello Handshake Detected, but full TLS Record NOT in TCP payload, even after waiting for: [expr {$loop_time * $loop_count}] ms"
+                                }
                             } else {
-                                if { $ctx(log) > 1 } { log local0.debug "$logPrefix Client Hello Handshake Detected, full TLS Record collected after waiting for: [expr {$loop_time * $loop_count}]" }
+                                if { $ctx(log) > 1 } { log local0.debug "$logPrefix Client Hello Handshake Detected, full TLS Record collected after waiting for: [expr {$loop_time * $loop_count}] ms" }
                                 set detect_handshake 1
                             }
                         }
@@ -236,15 +238,16 @@ when CLIENT_DATA priority 500 {
             TCP::release
             if { $ctx(log) > 1 } { log local0.debug "$logPrefix released payload" }
         }
-         } elseif { $ctx(ptcl) eq "http" } {
-             ## Enable HTTP processing
-             HTTP::enable
-             TCP::release
-         } else {
-             if { $ctx(log) } { log local0.notice "$logPrefix catchall reject" }
-             reject
-             return
-         }
+    } elseif { $ctx(ptcl) eq "http" } {
+        ## Enable HTTP processing
+        if { $ctx(log) > 1 } { log local0.debug "$logPrefix Detected HTTP, enabling HTTP profile, & release tcp." }
+        HTTP::enable
+        TCP::release
+    } else {
+        if { $ctx(log) } { log local0.notice "$logPrefix catchall reject" }
+        reject
+        return
+    }
 }
 when HTTP_REQUEST priority 500 {
     if { $ctx(log) > 1 } { log local0.debug "$logPrefix Firing HTTP_REQUEST on server irule" }
@@ -261,7 +264,7 @@ when HTTP_REQUEST priority 500 {
     HTTP::uri http://${http_hostname}:[TCP::local_port][HTTP::uri]
 }
 when HTTP_RESPONSE priority 300 {
-    if { $ctx(log) > 1 } { log local0.debug "$logPrefix Firing HTTP_RESPONSE on server irule" }
+    if { $ctx(log) > 1 } { log local0.debug "$logPrefix Firing HTTP_RESPONSE on server irule, proxy responded with HTTP protocol parsing enabled." }
     switch -glob -- [HTTP::status] {
         "2*" -
         "3*" {
@@ -309,23 +312,28 @@ when HTTP_RESPONSE priority 300 {
         }
     }
 }
+
 when SERVER_CONNECTED priority 900 {
-    ## Only do this for TLS traffic
+    ## Only do this for TLS traffic, where we're going to replay the TLS CLient Handshake
     if { ${option} } {
         if { $ctx(log) > 1 } { log local0.debug "$logPrefix Option TCP Collection on SERVER_CONNECTED" }
         TCP::collect 12
     }
 }
+
 when SERVER_DATA priority 900 {
+    # This only fires when TCP::collect is used, so no reason to check $option
+    if { $ctx(log) > 1 } { log local0.debug "$logPrefix Firing SERVER_DATA on server irule, proxy responded without HTTP protocol parsing enabled." }
     switch -glob -- [TCP::payload] {
         "HTTP/1.[01] 200*" {
-            if { $ctx(log) > 1 } { log local0.debug "$logPrefix SERVER_DATA replay SSL Client Hello: ${orig}" }
+            if { $ctx(log) > 1 } { log local0.debug "$logPrefix SERVER_DATA with 200 response from proxy, replaying SSL Client Hello: ${orig}" }
+            # Now now effectively have a TCP connection to the origin server, given how explicit forward proxy works.
             # drop the proxy status and replay the original handshake
             TCP::payload replace 0 [TCP::payload length] ""
             # Attempt to send the payload (orig tls handshake), but catch in case we lost connection or such.
-            if { [catch [TCP::respond [binary format H* $orig]] ]} {
-                if { $ctx(log) } { log local0.warning "Replay of TLS Handshake failed, likely connection to proxy dropped, error code: $::errorCode error info: $::errorInfo" }
-            }   
+            if { [catch [TCP::respond [binary format H* $orig]] returnCode ]} {
+                if { $ctx(log) } { log local0.warning "Replay of TLS Handshake failed, likely connection to proxy dropped, return value: $returnCode" }
+            }
         }
         "HTTP/1.[01] 400*" {
             # Bad Request
