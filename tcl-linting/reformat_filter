@@ -1,0 +1,124 @@
+#!/usr/bin/env tclsh
+#  Usage: reformat_filter < ugly.tcl > nice.tcl
+# Pulled from: https://pastebin.com/FRJKED96
+
+proc reformat { tclcode pad tabwidth } {
+
+	set tclcode [string trimright $tclcode "\r\n"]
+	set lines [split $tclcode \n]
+
+	set out ""
+	set empty 1
+	set continued no
+	set oddquotes 0
+	set line [lindex $lines 0]
+	# compute indentation of first line
+	regexp {^\s*} $line indentws
+	set expandws [string map [list "\t" [string repeat " " $tabwidth]] $indentws]
+	set indent [expr {int([string length $expandws]/$tabwidth+0.5)}]
+
+	set NR 0
+	foreach orig $lines {
+
+		incr NR
+		set newline [string trim $orig]
+		if { [string index $newline end] eq "\\" } { set newline [string trimleft $orig] }
+		if { $newline == "" } {
+			# comment out the following line if you want to keep several blank lines in a row
+			if { $empty } { continue }
+			set line ""
+			set empty 1
+		} else {
+			set line [string repeat $pad $indent]$newline
+			set empty 0
+		}
+		if { [string index $line end] eq "\\" } {
+			if { !$continued } {
+				incr indent 1
+				set continued yes
+			}
+		} elseif { $continued } {
+			incr indent -1
+			set continued no
+		}
+
+		if { ![regexp {^\s*#} $line] } {
+
+			# oddquotes contains : 0 when quotes are balanced
+			# and 1 when they are not
+			set oddquotes [expr {([count $line \"] + $oddquotes) % 2}]
+			if { !$oddquotes } {
+
+				set openbraces [count $line \{]
+				set closebraces [count $line \}]
+				set startclosebraces [countbegin $line \} \{]
+				set  nbbraces  $openbraces
+				incr nbbraces -$closebraces
+
+				if { $startclosebraces > 0 } {
+					# lines begins with closing braces
+					# remove indentation already here, not only next line
+					#puts "Fire: $line"
+					set thisindent [expr {$indent-$startclosebraces}]
+					if { $thisindent < 0 } {
+						puts stderr "Unbalanced braces (line $NR: $line)"
+						set thisindent 0
+					}
+					set line [string repeat $pad $thisindent]$newline
+				}
+
+				incr indent $nbbraces; # [GWM] 010409 multiple open braces
+				if { $indent < 0 } {
+					puts stderr "Unbalanced braces (line $NR: $line)"
+					set indent 0
+				}
+
+			} else {
+				# unbalanced quotes, preserve original indentation
+				set line $orig
+			}
+		}
+
+		append out $line\n
+
+	}
+
+	return $out
+
+}
+
+proc count { string char } {
+	set count 0
+	while { [set idx [string first $char $string]] >= 0 } {
+		set backslashes 0
+		set nidx $idx
+		while { [string equal [string index $string [incr nidx -1]] \\] } {
+			incr backslashes
+		}
+		if {$backslashes % 2 == 0} {
+			incr count
+		}
+		set string [string range $string [incr idx] end]
+	}
+	return $count
+}
+
+proc countbegin { string char charnot } {
+	set idx [string first $charnot $string]
+	if { $idx >= 0 } {
+		set trstr [string range $string 0 $idx]
+	} else {
+		set trstr $string
+	}
+	return [count $trstr $char]
+}
+
+# basic interface for indenting stdin to stdout -- use as a filter
+if { $argc != 0 } {
+	puts stderr "Usage: reformat_filter < ugly.tcl > nice.tcl"
+	exit
+}
+fconfigure stdin -translation auto -encoding utf-8
+fconfigure stdout -translation auto -encoding utf-8
+set data [read stdin]
+puts -nonewline [reformat $data "    " 4]
