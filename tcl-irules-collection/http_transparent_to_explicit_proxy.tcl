@@ -336,47 +336,47 @@ when SERVER_DATA priority 900 {
     # This only fires when TCP::collect is used, so no reason to check $option
     if { $ctx(log) > 1 } { log local0.debug "${logPrefix}: Firing SERVER_DATA on server irule, proxy responded without HTTP protocol parsing enabled." }
     switch -glob -- [TCP::payload] {
-        "HTTP/1.[01] 200*" {
+        "HTTP/1.? 200*" {
             if { $ctx(log) > 1 } { log local0.debug "${logPrefix}: SERVER_DATA with 200 response from proxy, replaying SSL Client Hello: ${orig}" }
             # Now now effectively have a TCP connection to the origin server, given how explicit forward proxy works.
             # drop the proxy status and replay the original handshake
             TCP::payload replace 0 [TCP::payload length] ""
             # Attempt to send the payload (orig tls handshake), but catch in case we lost connection or such.
-            if { [catch [TCP::respond [binary format H* $orig]] returnCode ]} {
-                if { $ctx(log) } { log local0.warning "${logPrefix}: ERROR: Replay of TLS Handshake failed, likely connection to proxy dropped, return value: $returnCode" }
+            if { [catch { TCP::respond [binary format H* ${orig} ] } returnCode ] } {
+                if { $ctx(log) } { log local0.warning "${logPrefix}: ERROR: Replay of TLS Handshake failed, likely connection to proxy dropped, return value: ${returnCode}" }
             }
         }
-        "HTTP/1.[01] 400*" {
+        "HTTP/1.? 400*" {
             # Bad Request
             if { $ctx(log) } { log local0.notice "${logPrefix}: reject for http 400 from proxy" }
             # reject
             # return
         }
-        "HTTP/1.[01] 403*" {
+        "HTTP/1.? 403*" {
             # Forbidden
             if { $ctx(log) } { log local0.notice "${logPrefix}: reject for http 403 from proxy" }
             # reject
             # return
         }
-        "HTTP/1.[01] 407*" {
+        "HTTP/1.? 407*" {
             # stub for when authentication is required
             if { $ctx(log) } { log local0.notice "${logPrefix}: reject for http 407 from proxy" }
             # reject
             # return
         }
-        "HTTP/1.[01] 502*" {
+        "HTTP/1.? 502*" {
             # Bad Gateway (proxy error)
             if { $ctx(log) } { log local0.notice "${logPrefix}: reject for http 502 from proxy" }
             # reject
             # return
         }
-        "HTTP/1.[01] 503*" {
+        "HTTP/1.? 503*" {
             # Service Unavailable
             if { $ctx(log) } { log local0.notice "${logPrefix}: reject for http 503 from proxy" }
             # reject
             # return
         }
-        "HTTP/1.[01] 504*" {
+        "HTTP/1.? 504*" {
             # Gateway Timeout
             if { $ctx(log) } { log local0.notice "${logPrefix}: reject for http 504 from proxy" }
             # reject
@@ -388,5 +388,8 @@ when SERVER_DATA priority 900 {
             # return
         }
     }
+    # Release the TCP collection:
     TCP::release
+    # Unset our orig var, which could contain a fair bit of data (The Full TLS Handshake, 300-10k bytes typical ):
+    unset -- orig
 } ;# END SERVER_DATA priority 900
