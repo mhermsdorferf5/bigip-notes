@@ -73,6 +73,10 @@ proc normalize_header_list {hdrvals} {
 }
 
 when HTTP_REQUEST priority 1 {
+
+    # If an LTM Policy has redirected, we must bail, as no HTTP objects will be valid
+    # see: https://my.f5.com/manage/s/article/K23237429
+    if { [HTTP::has_responded] } { return }
     
     set requestMethod [HTTP::method]
  
