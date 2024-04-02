@@ -4,6 +4,7 @@
 # v1.03 - moved header value normalization to proc normalize_header_list to reduce code complexity
 # v1.04 - added support for remote logging via HSL
 # v1.05 - added checking for last T-E/C-L header being empty; removed static global vars.
+# v1.06 - added check for K23237429; with HTTP::has_responded, in case LTM policies redirect first.
 
 # All logs are in the following format - change as you see fit
 # MsgID,Client IP,Server Name,HTTP Host header value,Note
