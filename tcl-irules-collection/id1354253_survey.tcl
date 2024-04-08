@@ -5,6 +5,7 @@
 # v1.04 - added support for remote logging via HSL
 # v1.05 - added checking for last T-E/C-L header being empty; removed static global vars.
 # v1.06 - added check for K23237429; with HTTP::has_responded, in case LTM policies redirect first.
+# v1.07 - Enhanced loggign to log URI, User-Agent, and empty/improper values.
 
 # All logs are in the following format - change as you see fit
 # MsgID,Client IP,Server Name,HTTP Host header value,Note
@@ -48,7 +49,7 @@ proc id1354253_logger {code msg hslconn} {
     # Conditionally log locally to /var/log/ltm or HSL
     # Consider logging remotely using HSL (see https://clouddocs.f5.com/api/irules/HSL.html) on production
     # or high-volume systems
-    set logMessage "$code,[IP::client_addr],[virtual name],[HTTP::host],\"$msg\""
+    set logMessage "$code,[IP::client_addr],[virtual name],[HTTP::method] [HTTP::host][HTTP::uri],[HTTP::header value User-Agent],\"$msg\""
     if {$hslconn == 0} {
         log $logMessage
         # Comment the above and uncomment the below to log without rate limiting
@@ -83,12 +84,12 @@ when HTTP_REQUEST priority 1 {
  
     # Check if there >1 Transfer-Encoding headers, warn if so as some of our checks are not 100% per ID1354253
     if {[HTTP::header count Transfer-Encoding] > 1} {
-        call id1354253_logger "100" "Warning: Multiple ([HTTP::header count Transfer-Encoding]) Transfer-Encoding headers found" $hsl
+        call id1354253_logger "100" "Warning: Multiple ([HTTP::header count Transfer-Encoding]) Transfer-Encoding headers found: [HTTP::header values Transfer-Encoding]" $hsl
     }
  
     # Check if there are >1 Content-Length headers, warn if so as some of our checks are not 100% per ID1354253
     if {[HTTP::header count Content-Length] > 1} {
-        call id1354253_logger "200" "Warning: Multiple ([HTTP::header count Content-Length]) Content-Length headers found" $hsl
+        call id1354253_logger "200" "Warning: Multiple ([HTTP::header count Content-Length]) Content-Length headers found: [HTTP::header values Content-Length] " $hsl
     }
  
     # With mulitple T-E headers we get a list back, but if any of those headers have multiple values we have
@@ -132,7 +133,7 @@ when HTTP_REQUEST priority 1 {
         set lastClVal 0
         foreach clVal $contentLengthNormalizedValues {
             if {($clVal eq "" || $clVal < 0) && ([string tolower [HTTP::header names]] contains "content-length")} {
-                call id1354253_logger "201" "Request with empty Content-Length" $hsl
+                call id1354253_logger "201" "Request with empty Content-Length: ${contentLengthNormalizedValues}" $hsl
             }
  
             if {(![string is double -strict $clVal] || [string match "*+*" $clVal] || [string match "*-*" $clVal] || [string match "*.*" $clVal] || [string match "*x*" $clVal]) && $clVal ne ""} {
@@ -140,7 +141,7 @@ when HTTP_REQUEST priority 1 {
             }
  
             if {($clVal ne $lastClVal) && ($lastClVal ne 0)} {
-                call id1354253_logger "203" "Request with multiple Content-Length values, but values are not identical: $clVal != $lastClVal" $hsl
+                call id1354253_logger "203" "Request with multiple Content-Length values, but values are not identical: $clVal != $lastClVal: : ${contentLengthNormalizedValues}" $hsl
             }
             set lastClVal $clVal
         }
@@ -154,7 +155,7 @@ when HTTP_REQUEST priority 1 {
         if { (([string tolower $header_value] contains "content-length") ||
         ([string tolower $header_value] contains "transfer-encoding")) &&
         ([string first ":" $header_value] >= 0) } {
-            call id1354253_logger "300" "Request from [IP::client_addr] due to presence of suspect header value of $header" $hsl
+            call id1354253_logger "300" "Request due to presence of suspect header value of $header: $header_value" $hsl
         }
     }
 
@@ -162,13 +163,13 @@ when HTTP_REQUEST priority 1 {
     if {[HTTP::header count "Transfer-Encoding"] >= 1} {
         # HTTP::Header value pulls the last value from the list of headers, per F5 docs.
         if { [string trim [HTTP::header value "Transfer-Encoding"]] == "" } {
-            call id1354253_logger "401" "Request from [IP::client_addr] due to last Transfer-Encoding header being empty." $hsl
+            call id1354253_logger "401" "Request due to last Transfer-Encoding header being empty." $hsl
         }
     }
     if {[HTTP::header count "Content-Length"] >= 1 } {
         # HTTP::Header value pulls the last value from the list of headers, per F5 docs.
         if { [string trim [HTTP::header value "Content-Length"]] == "" } {
-            call id1354253_logger "402" "Request from [IP::client_addr] due to last Content-Length Header being empty." $hsl
+            call id1354253_logger "402" "Request due to last Content-Length Header being empty." $hsl
         }
     }
 
