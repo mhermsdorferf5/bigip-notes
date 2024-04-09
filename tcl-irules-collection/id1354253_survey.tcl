@@ -8,15 +8,15 @@
 # v1.07 - Enhanced loggign to log URI, User-Agent, and empty/improper values.
 
 # All logs are in the following format - change as you see fit
-# MsgID,Client IP,Server Name,HTTP Host header value,Note
+# <code>,<Client-IP>,<Virtual Server Name>,<HTTP Method> <HTTP Host Header><HTTP URI>,<HTTP User-Agent>,<Error Message, always containing the value(s) of the header in question>
 # e.g.,
-# 100,10.0.0.1,Test_VS_443,www.example.com,"Warning: Multiple (2) Transfer-Encoding headers found"
+# 201,70.225.23.155,/Common/test_vip_vip,GET example.com/foo/bar,curl/7.88.1,"Request with empty Content-Length: "
 
 # 100 - Multiple T-E headers found
 # 200 - Multiple C-L headers found
 # 101 - Invalid T-E header value not one of validTransferEncodings
 # 102 - Invalid T-E header value (chunked not last value or value of last T-E header)
-# 201 - Empty C-L (C-L failed to parse or is 0)
+# 201 - Empty C-L (C-L failed to parse or is less than 0)
 # 202 - Invalid C-L (C-L not integer value)
 # 203 - Invalid C-L (C-L has non-identical multiple values)
 # 300 - Suspect header smuggling (colon found in header value)
@@ -133,6 +133,10 @@ when HTTP_REQUEST priority 1 {
         set lastClVal 0
         foreach clVal $contentLengthNormalizedValues {
             if {($clVal eq "" || $clVal < 0) && ([string tolower [HTTP::header names]] contains "content-length")} {
+                # Note: This will trigger on valid Content-Length requests larger than 9,223,372,036,854,775,807 bytes or 9.223 Exabytes.
+                # this is due to TCL limitations, where it processes all math evaluations as C 64bit long type numbers.
+                # If for some exceptional reason you have valid rquests with such massivly large content-length headers,
+                # have no fear they'll still work after implementing the fix for id1354253, this is a TCL limitation, not an F5 HTTP Parser limitation.
                 call id1354253_logger "201" "Request with empty Content-Length: ${contentLengthNormalizedValues}" $hsl
             }
  
