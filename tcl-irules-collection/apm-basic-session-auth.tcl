@@ -8,7 +8,7 @@ when HTTP_REQUEST {
 
     # IF the request is for the /getSessionID URI, then let's respond with a simple html page that contains the session id.
     # Users will access this page to easily get their APM Session ID, that they can use for basic auth.
-    if { [HTTP::uri] == "/getSessionID" } {
+    if { [string tolower [HTTP::uri]] == "/getsessionid" } {
         if { [HTTP::has_responded] } { return }
         if { [ACCESS::session exists -state_allow [HTTP::cookie value "MRHSession"]] } {
             HTTP::respond 200 content "<html><head><title>APM Session Value Responder</title></html><body><h2>APM SessionID:</h2><h2 id=\"mySessionID\">[HTTP::cookie value "MRHSession"]</h2><button class=\"btn\" onclick=\"copyContent()\">Copy!</button><p><a href=\"https://[HTTP::host]\/\">Return to main site.</a></p><script>let text = document.getElementById('mySessionID').innerHTML; const copyContent = async () => { try { await navigator.clipboard.writeText(text); console.log('Content copied to clipboard') } catch (err) { console.error('Failed to copy: ', err); } } </script></body></html>\n"
