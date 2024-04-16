@@ -7,10 +7,13 @@ when HTTP_REQUEST {
     ##   0 = Disable debug logging.
     set debug 1
 
-    # if github token auth should be enabled, then set this to 1, if it should be disabled set it to 0.
+    # If github token auth should be enabled, then set this to 1, if it should be disabled set it to 0.
     # This considers requests to github with a Bearer token as requests containing a github personal access token.
     # Not this doesn't use duo 2fa nor LDAP auth, it instead relies on the fact that the authenticated indvidual created a github personal access token.
     set githubTokenAuthEnabled 1
+    # If github token auth is enabled, then we only want to check for the github domain name
+    # update this variable with the dns hostname for the github VIP that users will access.
+    set githubDomainName "github"
 
     ### END CONFIGURATION OPTIONS ###
 
@@ -76,6 +79,30 @@ when HTTP_REQUEST {
                 HTTP::respond 403 content "<html><head><title>No Valid APM Session Found!</title></html><body><h2>No valid APM session found for session id: ${sessionid}</h2></body></html>\n"
             }
         }
+
+        # Check if the request is for github, and github token auth is enabled:
+        if { ([string tolower [HTTP::host]] contains $githubDomainName) && $githubTokenAuthEnabled } {
+        
+            # If we have an Authorization header with bearer auth, and it's a github request, then bypass apm and assume github access token.
+            # Not this doesn't use duo 2fa, it relies on the fact that the authenticated indvidual created a github access token.
+            if { ([string tolower [HTTP::header value "Authorization"]] contains "bearer") 
+                && ([string tolower [HTTP::host]] contains ${githubDomainName})
+                && $githubTokenAuthEnabled } {
+                # Insert ClientLess header:
+                HTTP::header insert "Clientless-Mode" "1"
+                if { $debug } { log local0.debug "$logPrefix Request for github with bearer token, bypassing APM. | Authorization: [HTTP::header value Authorization]" }
+                return
+            }
+            
+            # If the password starts with ghp_ or github_pat_ then this is a Github Personal Access token.
+            # Not this doesn't use duo 2fa, it relies on the fact that the authenticated indvidual created a github access token.
+            if { ([HTTP::password] starts_with "ghp_") || ([HTTP::password] starts_with "github_pat_") } {
+                # Insert ClientLess header:
+                HTTP::header insert "Clientless-Mode" "1"
+                if { $debug } { log local0.debug "$logPrefix Request for github with Personal Access token, bypassing APM. | Authorization: [HTTP::header value Authorization]" }
+                return
+            }
+        }
     
         # If we have an Authorization header with basic auth, we need to check the username & password for a valid APM session.
         if { [string tolower [HTTP::header value "Authorization"]] contains "basic" } {
@@ -98,6 +125,7 @@ when HTTP_REQUEST {
                     set insertResponseCookie 1
                     # Insert SSO Auth Header:
                     HTTP::header replace "Authorization" "Basic [b64encode "${sessionUsername}:[ACCESS::session data get -sid ${sessionid} -secure session.sso.token.last.password]"]"
+                    return
                 } else {
                     if { $debug } { log local0.debug "$logPrefix APM Session found for \'${sessionid}\', however APM Session username: \'${sessionUsername}\' does not match http basic auth username: \'${username}\'" }
                     HTTP::respond 403 content "<html><head><title>No Valid APM Session Found!</title></html><body><h2>No valid APM session found for user: ${username} with session id: ${sessionid}</h2></body></html>\n"
@@ -109,16 +137,6 @@ when HTTP_REQUEST {
                 HTTP::respond 403 content "<html><head><title>No Valid APM Session Found!</title></html><body><h2>No valid APM session found for user: ${username} with session id: ${sessionid}</h2></body></html>\n"
                     return
             }
-        }
-        
-        # If we have an Authorization header with bearer auth, and it's a github request, then bypass apm and assume github personal access token.
-        # Not this doesn't use duo 2fa, it relies on the fact that the authenticated indvidual created a github personal access token.
-        if { ([string tolower [HTTP::header value "Authorization"]] contains "bearer") 
-            && ([string tolower [HTTP::host]] contains "github")
-            && $githubTokenAuthEnabled } {
-            # Insert ClientLess header:
-            HTTP::header insert "Clientless-Mode" "1"
-            if { $debug } { log local0.debug "$logPrefix Request for github with bearer token, bypassing APM. | Authorization: [HTTP::header value Authorization]" }
         }
     }
 }
