@@ -8,6 +8,10 @@ Pools, Log Destinations, and Log Publishers will be used for: AFM, DoS, BOT, and
 * Create formatted HSL destination(s) pointing to unformatted HSL destination(s).
 * Create publisher(s) containing multiple or one specific desired destination(s).
 * Update or Create new Security Logging Profiles to point to the new logging publisher(s).
+* Apply Security Logging Profiles to any/all virtual servers.
+* Additionally, for AFM/DOS be sure to configure the device log publisher for AFM Management & Device DoS:
+  * Options => Firewall Options => Log Publisher.
+  * Dos Protection => Device Protection => Log Publisher
 
 ### Note differences between how ASM/AdvWAF logging works and other security features: 
 You can only have one security logging profile on a VIP with a specific configuration for: AFM, Bot, or DoS.  So if you want to send those logs to multiple destinations you need to send it to a publisher that contains all the desired destinations.
@@ -19,12 +23,8 @@ I advise you create a single security logging profile for: AFM/DoS/BoT, however 
 * Summary:
   * ASM: Separate Security Logging profiles for each different destinations.
   * AFM/DoS/BOT/Etc: Single security logging profile pointing to a log publisher with all the desired destinations.
- 
-* Additionally, for AFM/DOS be sure to configure the device log publisher for AFM Management & Device DoS:
-  * Options => Firewall Options => Log Publisher.
-  * Dos Protection => Device Protection => Log Publisher
 
-### Docs:
+### Supporting Docs:
 
 * High Speed Logging for AFM:
   * https://techdocs.f5.com/en-us/bigip-15-0-0/external-monitoring-of-big-ip-systems-implementations/configuring-remote-high-speed-logging-of-network-firewall-events.html
@@ -32,11 +32,11 @@ I advise you create a single security logging profile for: AFM/DoS/BoT, however 
 * High Speed Logging for DoS:
     * https://techdocs.f5.com/en-us/bigip-15-1-0/big-ip-system-dos-protection-and-protocol-firewall-implementations/configuring-high-speed-remote-logging-of-protocol-security-events.html
  
-* Non High Speed, standard Syslog for all of BIG-IP's linux management station's syslog-ng events:
-    * https://my.f5.com/manage/s/article/K13080
- 
 * High Speed Logging for ASM/AdvWAF: 
     * https://techdocs.f5.com/en-us/bigip-14-1-0/big-ip-asm-implementations-14-1-0/logging-application-security-events.html
+ 
+* Non High Speed, standard Syslog for all of BIG-IP's linux management station's syslog-ng events:
+    * https://my.f5.com/manage/s/article/K13080
  
 
 ### Ancillary docs:
