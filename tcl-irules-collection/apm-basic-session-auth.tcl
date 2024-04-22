@@ -32,10 +32,10 @@ when HTTP_REQUEST {
     if { [string tolower [HTTP::uri]] == "/getsessionid" } {
         if { [HTTP::has_responded] } { return }
         if { [ACCESS::session exists -state_allow [HTTP::cookie value "MRHSession"]] } {
-            HTTP::respond 200 content "<html><head><title>APM Session Value Responder</title></html><body><h2>APM SessionID:</h2><h2 id=\"mySessionID\">[HTTP::cookie value "MRHSession"]</h2><button class=\"btn\" onclick=\"copyContent()\">Copy!</button><p><a href=\"https://[HTTP::host]\/\">Return to main site.</a></p><script>let text = document.getElementById('mySessionID').innerHTML; const copyContent = async () => { try { await navigator.clipboard.writeText(text); console.log('Content copied to clipboard') } catch (err) { console.error('Failed to copy: ', err); } } </script></body></html>\n"
+            HTTP::respond 200 -version auto content "<html><head><title>APM Session Value Responder</title></html><body><h2>APM SessionID:</h2><h2 id=\"mySessionID\">[HTTP::cookie value "MRHSession"]</h2><button class=\"btn\" onclick=\"copyContent()\">Copy!</button><p><a href=\"https://[HTTP::host]\/\">Return to main site.</a></p><script>let text = document.getElementById('mySessionID').innerHTML; const copyContent = async () => { try { await navigator.clipboard.writeText(text); console.log('Content copied to clipboard') } catch (err) { console.error('Failed to copy: ', err); } } </script></body></html>\n"
             return
         } else {
-            HTTP::respond 200 content "<html><head><title>APM Session Value Responder</title></html><body><h2>No Valid APM Session found! <a href=\"https://[HTTP::host]\/\">return to login page.</a></h2></body></html>\n"
+            HTTP::respond 200 -version auto content "<html><head><title>APM Session Value Responder</title></html><body><h2>No Valid APM Session found! <a href=\"https://[HTTP::host]\/\">return to login page.</a></h2></body></html>\n"
             return
         }
     }
@@ -62,7 +62,7 @@ when HTTP_REQUEST {
         if { $debug } { log local0.debug "$logPrefix | Request from non-browser client | Authorization: [HTTP::header value Authorization] | Git-Protocol: [HTTP::header value Git-Protocol] | Headers: [HTTP::header names] | Cookies: [HTTP::header value Cookie]" }
         if { !([HTTP::header names] contains "Authorization" || [HTTP::cookie names] contains "MRHSession") } {
             if { $debug }  { log local0.debug "$logPrefix Sending 401"}
-            HTTP::respond 401 WWW-Authenticate "Basic realm=\"[HTTP::host]\""
+            HTTP::respond 401 -version auto WWW-Authenticate "Basic realm=\"[HTTP::host]\""
             return
         }
 
@@ -76,7 +76,7 @@ when HTTP_REQUEST {
                 return
             } else {
                 if { $debug } { log local0.debug "$logPrefix Request with invalid MRH Session Cookie $sessionid" }
-                HTTP::respond 403 content "<html><head><title>No Valid APM Session Found!</title></html><body><h2>No valid APM session found for session id: ${sessionid}</h2></body></html>\n"
+                HTTP::respond 403 -version auto content "<html><head><title>No Valid APM Session Found!</title></html><body><h2>No valid APM session found for session id: ${sessionid}</h2></body></html>\n"
             }
         }
 
@@ -85,9 +85,7 @@ when HTTP_REQUEST {
         
             # If we have an Authorization header with bearer auth, and it's a github request, then bypass apm and assume github access token.
             # Not this doesn't use duo 2fa, it relies on the fact that the authenticated indvidual created a github access token.
-            if { ([string tolower [HTTP::header value "Authorization"]] contains "bearer") 
-                && ([string tolower [HTTP::host]] contains ${githubDomainName})
-                && $githubTokenAuthEnabled } {
+            if { ([string tolower [HTTP::header value "Authorization"]] contains "bearer") } {
                 # Insert ClientLess header:
                 HTTP::header insert "Clientless-Mode" "1"
                 if { $debug } { log local0.debug "$logPrefix Request for github with bearer token, bypassing APM. | Authorization: [HTTP::header value Authorization]" }
@@ -128,13 +126,13 @@ when HTTP_REQUEST {
                     return
                 } else {
                     if { $debug } { log local0.debug "$logPrefix APM Session found for \'${sessionid}\', however APM Session username: \'${sessionUsername}\' does not match http basic auth username: \'${username}\'" }
-                    HTTP::respond 403 content "<html><head><title>No Valid APM Session Found!</title></html><body><h2>No valid APM session found for user: ${username} with session id: ${sessionid}</h2></body></html>\n"
+                    HTTP::respond 403 -version auto content "<html><head><title>No Valid APM Session Found!</title></html><body><h2>No valid APM session found for user: ${username} with session id: ${sessionid}</h2></body></html>\n"
                     return
                 }
             } else {
                 # Don't log the SessionID provided unless it's a valid SessionID, this is because users tend to inadvertently put their password here.
                 if { $debug } { log local0.debug "$logPrefix NO valid APM Session found for username \'${username}\', with provided SessionID." }
-                HTTP::respond 403 content "<html><head><title>No Valid APM Session Found!</title></html><body><h2>No valid APM session found for user: ${username} with session id: ${sessionid}</h2></body></html>\n"
+                HTTP::respond 403 -version auto content "<html><head><title>No Valid APM Session Found!</title></html><body><h2>No valid APM session found for user: ${username} with session id: ${sessionid}</h2></body></html>\n"
                     return
             }
         }
