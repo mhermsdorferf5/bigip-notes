@@ -14,9 +14,9 @@ when CLIENT_ACCEPTED priority 50 {
     set max_loop_count 2500
 } ;#END CLIENT_ACCEPTED priority 50
 
-###################################################
-######## NO CUSTOMIZATION BELOW THIS LINE #########
-###################################################
+######################################################
+######## NO CUSTOMIZATION BELOW THIS LINE v4 #########
+######################################################
 
 when CLIENT_ACCEPTED priority 250 {
 
