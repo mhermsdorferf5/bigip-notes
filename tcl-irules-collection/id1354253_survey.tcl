@@ -6,6 +6,7 @@
 # v1.05 - added checking for last T-E/C-L header being empty; removed static global vars.
 # v1.06 - added check for K23237429; with HTTP::has_responded, in case LTM policies redirect first.
 # v1.07 - Enhanced loggign to log URI, User-Agent, and empty/improper values.
+# v1.08 - Fixed bug aroudn variables being unset/set in client_accepted.
 
 # All logs are in the following format - change as you see fit
 # <code>,<Client-IP>,<Virtual Server Name>,<HTTP Method> <HTTP Host Header><HTTP URI>,<HTTP User-Agent>,<Error Message, always containing the value(s) of the header in question>
@@ -179,5 +180,5 @@ when HTTP_REQUEST priority 1 {
 
  
     unset -nocomplain requestMethod transferEncodingValues teVal teValNorm innerVal transferEncodingNormalizedValues encodingValue
-    unset -nocomplain contentLengthValues clVal clValNorm contentLengthNormalizedValues lastClVal header header_value hsl
+    unset -nocomplain contentLengthValues clVal clValNorm contentLengthNormalizedValues lastClVal header header_value
 }
