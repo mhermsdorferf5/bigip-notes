@@ -57,6 +57,8 @@ This config sends to separate syslogs listeners for each different module/log so
 Note: the examples use 192.0.2.100 as the remote syslog server's IP.
 
 ### Log Destinations
+Note, for the last set of config destinations, change the destination from splunk to whatever is desired for the message format.
+Message format options can be found here: https://my.f5.com/manage/s/article/K57555038
 ```
 create ltm pool hsl-dest-afm   { members replace-all-with { 192.0.2.100:2514 } monitor tcp }
 create ltm pool hsl-dest-dos   { members replace-all-with { 192.0.2.100:3514 } monitor tcp }
