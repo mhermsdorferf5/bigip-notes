@@ -46,7 +46,9 @@ I advise you create a single security logging profile for: AFM/DoS/BoT, however 
   * https://clouddocs.f5.com/cli/tmsh-reference/v13/modules/sys/sys_log-config_destination_remote-syslog.html
 * F5 BIG-IP System/Management syslog Logging Facilities:
   * https://my.f5.com/manage/s/article/K13317
-
+* F5 HSL Format options:
+  * Examples of Splunk, CEF, IPFIX, and various Syslog formats:
+  * https://my.f5.com/manage/s/article/K57555038
 
 
 
