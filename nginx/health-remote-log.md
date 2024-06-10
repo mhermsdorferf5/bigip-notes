@@ -194,3 +194,74 @@ Health Check Error:
   }
 ]
 ```
+
+
+## Python syslog listiner to update upstreams
+Let's say you wanted to do some complex set of actions based on an nginx upstream going up or down.  You could have a python script (or any other preferred programing language) that listens for basic syslog messages, and then performs some action based on them.
+
+In this case, we've got a simple udp listener, which will then try to deploy a new upstream node when it senses one is down.
+
+```python
+import signal
+import socket
+import socketserver
+import re
+import requests
+import json
+
+
+HOST, PORT = "127.0.0.1", 5514
+
+NGINX_API_URI = "http://127.0.0.1:8888"
+
+def addUpstreamMember(upstream):
+    deployUpstream = requests.session()
+    deployUpstream.post('https://example.com/blah/')
+    print("deploying upstream with post request")
+
+    # this would normally be whatever you get back from your API to deploy upstreams as it's IP.
+    newUpstreamMember = "192.0.2.100:80"
+
+    updateNginxUpstream = requests.session()
+    addMember = {}
+    addMember["server"] = newUpstreamMember
+    addMember["weight"] = 1
+    addMember["max_conns"] = 0
+    addMember["max_fails"] = 2
+    addMember["fail_timeout"] = "10"
+    addMember["slow_start"] = "10s"
+    addMember["backup"] = "false"
+    addMember["down"] = "true"
+
+    updateNginxUpstream.post('%s/api/9/http/upstreams/%s/servers' % (NGINX_API_URI, upstream), data=json.dumps(addMember) )
+
+
+class SyslogUDPHandler(socketserver.BaseRequestHandler):
+    def handle(self):
+        data = bytes.decode(self.request[0].strip())
+        if "peer is unhealthy" in str(data):
+            regexMatch = re.match('.*of peer (\S+) in upstream (\S+)\s?.*', str(data))
+            upstreamMember = regexMatch.group(1)
+            upstreamName   = regexMatch.group(2)
+            print("Unhealthy peer %s in in upstream %s" % (upstreamMember, upstreamName) )
+            addUpstreamMember(upstreamName)
+
+
+if __name__ == "__main__":
+    print(f"Starting Syslog Server on {HOST}:{PORT}")
+    try:
+        server = socketserver.UDPServer((HOST,PORT), SyslogUDPHandler)
+        server.serve_forever(poll_interval=0.5)
+    except (IOError, SystemExit):
+        raise
+    except KeyboardInterrupt:
+        print ("Crtl+C Pressed. Shutting down.")
+
+
+    def signal_handler(sig, frame):
+        server.shutdown()
+
+    print('Stopping Syslog Server')
+    server.server_close()
+    exit(0)
+```
