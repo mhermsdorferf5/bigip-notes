@@ -196,8 +196,8 @@ Health Check Error:
 ```
 
 
-## Python syslog listiner to update upstreams
-Let's say you wanted to do some complex set of actions based on an nginx upstream going up or down.  You could have a python script (or any other preferred programing language) that listens for basic syslog messages, and then performs some action based on them.
+## Python syslog listener & add upstreams
+Let's say you wanted to do some complex set of actions based on an nginx upstream going up or down.  You could have a python script (or any other preferred programming language) that listens for basic syslog messages, and then performs some action based on them.
 
 In this case, we've got a simple udp listener, which will then try to deploy a new upstream node when it senses one is down.
 
