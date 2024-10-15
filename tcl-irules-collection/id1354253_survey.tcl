@@ -1,3 +1,10 @@
+# This iRule is intended to find any HTTP requests that would be dropped after upgrading to a version
+# of BIG-IP that fixes the security vunerabilities in id1354253, the BIG-IP's HTTP parserer.
+# see for details on this bug and the fixed versions: https://my.f5.com/manage/s/article/K000137322
+# Note this will have no affect if run on a BIG-IP version that contains fixes for id1354253.
+# as versiosn with the patch will drop HTTP requests prior to the iRule being executed.
+#
+# markh@f5.com
 # v1.00 - initial release
 # v1.01 - moved logging to a procedure id1354253_logger and added HTTP host header to log by default
 # v1.02 - rate limited logging by removing facility from call to log, see https://clouddocs.f5.com/api/irules/log.html for more info
