@@ -98,7 +98,9 @@ when HTTP_REQUEST priority 500 {
                 set bucket_name [lindex [split [HTTP::host] "."] 0]
             }
             "*.compat.objectstorage.*.oci.com" -
-            "*.compat.objectstorage.*.oraclecloud.com" {
+            "*.compat.objectstorage.*.oraclecloud.com" -
+            "*.objectstorage.*.oraclecloud.com" -
+            "*.objectstorage.*.oci.com" {
                 set obj_type "oci"
                 # bucket name is the first element of the hostname:
                 set bucket_name [lindex [split [HTTP::host] "."] 0]
@@ -106,8 +108,16 @@ when HTTP_REQUEST priority 500 {
             "objectstorage.*.oraclecloud.com" -
             "objectstorage.*.oci.com" {
                 set obj_type "oci"
-                # bucket name is the second element of the path:
-                set bucket_name [lindex [split [HTTP::path] "/"] 1]
+                if { [HTTP::path] starts_with "/n/" } {
+                    # bucket name is the second element of the path:
+                    set bucket_name [lindex [split [HTTP::path] "/"] 2]
+                } else {
+                    for uri_element { 0 1 } {
+                        # bucket name is the first element of the path:
+                        set bucket_name [lindex 
+                    # bucket name is the first element of the path:
+                    set bucket_name [lindex [split [HTTP::path] "/"] 1]
+                }
             }
             "*.blob.core.windows.net" {
                 set obj_type "azure"
@@ -159,6 +169,10 @@ when HTTP_REQUEST priority 500 {
                 HTTP::respond 403 content "Access Denied" reason "Forbidden"
             } else {
                 call log_action "staged-block" "$obj_type" "$bucket_name"
+            }
+        } else {
+            if { $whitelist_log_all } {
+                call log_action "allow" "$obj_type" "$bucket_name"
             }
         }
     }
