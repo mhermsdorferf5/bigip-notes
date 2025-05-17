@@ -1,7 +1,7 @@
 # SSH Proxy Config Example
 
-[Official SSH Proxy Documentation](https://techdocs.f5.com/kb/en-us/products/big-ip-afm/manuals/product/network-firewall-policies-implementations-12-1-0/13.html)
-[AFM Logging Configuration](https://my.f5.com/manage/s/article/K03094407)
+* [Official SSH Proxy Documentation](https://techdocs.f5.com/kb/en-us/products/big-ip-afm/manuals/product/network-firewall-policies-implementations-12-1-0/13.html)
+* [AFM Logging Configuration](https://my.f5.com/manage/s/article/K03094407)
 
 ```
 ### Virtual Server and Pool
