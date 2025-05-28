@@ -38,9 +38,9 @@ If we further assume we are processing around 1,000 DNS Queries per second:
 
 The final assumption is that this will be RR set dependent, my testing is based on an average of 2.5 RRs per DNS request.
 
-### Failed Optimizations
+## Failed Optimizations
 
-List of failed optimization attempts, documented so that folks don't get clever and try them again.
+List of failed optimization attempts, documented so that clever folks don't waste time trying them again.
 
 * All tests done with a set of queries to records as follows:
   * A record with 4 RRs with authoritative TTLs set to 1.
