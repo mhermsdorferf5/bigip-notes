@@ -24,6 +24,8 @@ when DNS_RESPONSE {
 
 ### iRule Performance
 
+Note all of this is approximant, based on lots of assumptions real world results will be different.
+
 Processor CPU in Ghz:
 2,200,000,000
 (Note the i4800, has a 2.2ghz processor.)
@@ -35,3 +37,95 @@ If we further assume we are processing around 1,000 DNS Queries per second:
 (71,600/2,200,000,000)*1000 = 3.25% increase in CPU usage per every 1000 DNS responses per second.
 
 The final assumption is that this will be RR set dependent, my testing is based on an average of 2.5 RRs per DNS request.
+
+### Failed Optimizations
+
+List of failed optimization attempts, documented so that folks don't get clever and try them again.
+
+* All tests done with a set of queries to records as follows:
+  * A record with 4 RRs with authoritative TTLs set to 1.
+  * A record with 4 RRs with authoritative TTLs set to 0.
+  * A record with 1 RR with authoritative TTL set to 300.
+  * A record with 1 RR with authoritative TTL set to 60.
+
+#### iRule 1, most performant
+
+```tcl
+when DNS_RESPONSE {
+    foreach rr [DNS::answer] {
+        if { [DNS::ttl $rr] == 0 } {
+            DNS::ttl $rr 1
+        }
+    }
+}
+```
+
+Performance Results:
+```
+---------------------------------------------
+Ltm::Rule Event: dns-reset-ttl-0:DNS_RESPONSE
+---------------------------------------------
+Priority                    500
+Executions
+  Total                    1.9K
+  Failures                    0
+  Aborts                      0
+CPU Cycles on Executing
+  Average                 71.6K
+  Maximum                142.9K
+  Minimum                  3.4K
+```
+
+#### iRule 2, attempt at optimization but less performant
+
+```tcl
+when DNS_RESPONSE {
+    foreach rr [lsearch -inline -all [DNS::answer] 0] {
+        if { [DNS::ttl $rr] == 0 } {
+            DNS::ttl $rr 1
+        }
+    }
+}
+```
+
+Performance Results:
+```
+---------------------------------------------
+Ltm::Rule Event: dns-reset-ttl-0:DNS_RESPONSE
+---------------------------------------------
+Priority                    500
+Executions
+  Total                    1.2K
+  Failures                    0
+  Aborts                      0
+CPU Cycles on Executing
+  Average                 97.2K
+  Maximum                196.0K
+  Minimum                     0
+```
+
+#### iRule 3, further attempt at optimization but least performant
+
+```tcl
+when DNS_RESPONSE {
+    foreach rr [lsearch -inline -all [DNS::answer] 0] {
+        DNS::ttl $rr 1
+    }
+}
+```
+
+Performance Results:
+```
+---------------------------------------------
+Ltm::Rule Event: dns-reset-ttl-0:DNS_RESPONSE
+---------------------------------------------
+Priority                    500
+Executions
+  Total                    1.3K
+  Failures                    0
+  Aborts                      0
+CPU Cycles on Executing
+  Average                 97.5K
+  Maximum                179.7K
+  Minimum                     0
+```
