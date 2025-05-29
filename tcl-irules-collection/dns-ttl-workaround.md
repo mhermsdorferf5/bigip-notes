@@ -30,7 +30,7 @@ Processor CPU in Ghz:
 2,200,000,000
 (Note the i4800, has a 2.2ghz processor.)
 
-If we assume the iRule has an average run cpu cycles of 71,600 cycles.  (As tested in the lab, see assumptions below.)
+If we assume the iRule has an average run cpu cycles of 71,600 cycles.  (As tested in the lab, see assumptions below, final testing results ended up consistently faster at 21,600 cycles, but leaving the higher number to be conservative.)
 
 If we further assume we are processing around 1,000 DNS Queries per second:
 
@@ -42,9 +42,18 @@ The final assumption is that this will be RR set dependent, my testing is based 
 
 List of failed optimization attempts, documented so that clever folks don't waste time trying them again.
 
+Command used for performance testing:
+```bash
+dnsperf -s <f5-vip> -n 1000 -Q 100 -d dns-tt-test.dnsperf
+```
+
 * All tests done with a set of queries to records as follows:
-  * A record with 4 RRs with authoritative TTLs set to 1.
-  * A record with 4 RRs with authoritative TTLs set to 0.
+  * 2 records with 1 RR with authoritative TTLs set to 1.
+  * 2 records with 1 RR with authoritative TTLs set to 0.
+  * 2 records with 4 RRs with authoritative TTLs set to 1.
+  * 2 records with 4 RRs with authoritative TTLs set to 0.
+  * 2 records with 10 RRs with authoritative TTLs set to 1.
+  * 2 records with 10 RRs with authoritative TTLs set to 0.
   * A record with 1 RR with authoritative TTL set to 300.
   * A record with 1 RR with authoritative TTL set to 60.
 
@@ -67,16 +76,46 @@ Ltm::Rule Event: dns-reset-ttl-0:DNS_RESPONSE
 ---------------------------------------------
 Priority                    500
 Executions
-  Total                    1.9K
+  Total                   14.0K
   Failures                    0
   Aborts                      0
 CPU Cycles on Executing
-  Average                 71.6K
-  Maximum                142.9K
-  Minimum                  3.4K
+  Average                 21.6K
+  Maximum                165.2K
+  Minimum                     0
 ```
 
-#### iRule 2, attempt at optimization but less performant
+### iRule 2
+
+Attempt at more performance by simply incrementing every TTL by 1
+
+```tcl
+when DNS_RESPONSE {
+    foreach rr [DNS::answer] {
+        DNS::ttl $rr [expr [DNS::ttl $rr] + 1]
+    }
+}
+```
+
+Performance Results:
+```
+---------------------------------------------
+Ltm::Rule Event: dns-reset-ttl-0:DNS_RESPONSE
+---------------------------------------------
+Priority                   500
+Executions
+  Total                  14.0K
+  Failures                   0
+  Aborts                     0
+CPU Cycles on Executing
+  Average                35.8K
+  Maximum                 2.9M
+  Minimum                    0
+```
+
+#### iRule 3
+
+Attempt at optimization, by using lsearch to only loop into RRs with a TTL of 0.
 
 ```tcl
 when DNS_RESPONSE {
@@ -95,16 +134,19 @@ Ltm::Rule Event: dns-reset-ttl-0:DNS_RESPONSE
 ---------------------------------------------
 Priority                    500
 Executions
-  Total                    1.2K
+  Total                   14.0K
   Failures                    0
   Aborts                      0
 CPU Cycles on Executing
-  Average                 97.2K
-  Maximum                196.0K
+  Average                 50.7K
+  Maximum                226.1K
   Minimum                     0
 ```
 
-#### iRule 3, further attempt at optimization but least performant
+#### iRule 4
+
+Another attempt at optimization, by using lsearch to only loop into RRs with a TTL of 0.
+I have no idea how this turned out slightly slower than iRule #3...
 
 ```tcl
 when DNS_RESPONSE {
@@ -121,11 +163,11 @@ Ltm::Rule Event: dns-reset-ttl-0:DNS_RESPONSE
 ---------------------------------------------
 Priority                    500
 Executions
-  Total                    1.3K
+  Total                   14.0K
   Failures                    0
   Aborts                      0
 CPU Cycles on Executing
-  Average                 97.5K
-  Maximum                179.7K
+  Average                 52.2K
+  Maximum                220.8K
   Minimum                     0
 ```
