@@ -128,7 +128,13 @@ tmsh run sys failover standby
 
 ### Confirm failover
 
-On the upgrade device, confirm it's gone Active and is showing increasing traffic counts.  Also, a good idea to do some quick spot checks of various VIPs.
+On the upgraded device, confirm it's now Active and is showing increasing traffic counts.  Also, a good idea to do some quick spot checks of various VIPs, and to monitor the LTM logs for errors.
+
+```bash
+tmsh show sys failover
+tmsh show sys traffic
+tail -100f /var/log/ltm
+```
 
 ### Upgrade previously active, now standby BIG-IP
 
