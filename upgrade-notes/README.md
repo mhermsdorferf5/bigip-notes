@@ -8,6 +8,9 @@ Collection of notes, documentation, etc useful for upgrading BIG-IP software.
 * [K84205182: BIG-IP update and upgrade guide](https://my.f5.com/manage/s/article/K84205182)
 * [K7727: License activation may be required before a software upgrade for BIG-IP](https://my.f5.com/manage/s/article/K7727)
 * [K13845: Overview of supported BIG-IP upgrade paths and an upgrade planning reference](https://my.f5.com/manage/s/article/K13845)
+* For GTM/DNS Sync Group Upgrades
+  * [K11661449: Overview of BIG-IP DNS system software upgrades](https://my.f5.com/manage/s/article/K11661449)
+  * As noted above, be sure to take the additional steps when upgrading GTM/DNS sync groups, as improper upgrade procedures can lead to a loss of the GSLB configuration.
 
 ## Example upgrade script
 

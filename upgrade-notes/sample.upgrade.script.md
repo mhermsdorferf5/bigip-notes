@@ -1,6 +1,6 @@
 # BIG-IP Example Upgrade Script
 
-Example upgrade script for BIG-IP HA Pair.  No impact to traffic occurs until the upgrade section, all pre-steps are impact free.
+Example upgrade script for BIG-IP HA Pair, note this does not cover GSLB/GTM Sync Group Steps.  No impact to traffic occurs until the upgrade section, all pre-steps are impact free.
 
 For full instructions see: [K84205182: BIG-IP update and upgrade guide](https://my.f5.com/manage/s/article/K84205182)
 
