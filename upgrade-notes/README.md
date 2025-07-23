@@ -16,6 +16,8 @@ Collection of notes, documentation, etc useful for upgrading BIG-IP software.
 
 An example upgrade manual script can be found here: [sample upgrade script](sample.upgrade.script.md).  This document walks through the basic steps of getting pre-change backups, qkviews, and pool/virtual server state, along with the typical upgrade steps and post-change qkviews and virtual/pool states for comparison.
 
+An example upgrade script for a GSLB sync group can be found here: [sample gslb upgrade script](sample.gslb.upgrade.script.md)
+
 ## Upgrades from BIG-IP pre-v14 to v14 or higher
 
 A change in iRule validation may break iRules if using any of the following commands: HTTP::respond, HTTP::redirect, HTTP::retry.  For details see: [K23237429: TCL error: ERR_NOT_SUPPORTED after upgrade to version 14.1.0 or later](https://my.f5.com/manage/s/article/K23237429)
