@@ -13,6 +13,16 @@ These steps should happen on all devices in the DNS Sync group.
 * Confirm all needed base ISO images and EHF ISO files required for the upgrade are in /shared/images/
 ```ls -la /shared/images```
 
+### Verify the configuration is saved to disk before proceeding
+
+* Confirm all devices in the sync group have their configuration saved to disk.
+* By default auto-sync doesn't persist the configuration to disk, it's important to persist the config to disk before proceeding with the upgrade.
+
+```bash
+tmsh save sys config
+tmsh save sys config gtm-only
+```
+
 ### Check service check date
 
 * for v17.1.x this should a date after: 2023-02-08, for v17.5.x after: 2025-02-12
