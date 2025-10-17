@@ -199,7 +199,7 @@ tmsh list gtm global-settings general synchronization-group-name
 If sync group name matches the newly set name, then re-enable synchronization.
 
 ```bash
-tmsh modify gtm global-settings general synchronization no
+tmsh modify gtm global-settings general synchronization yes
 tmsh save sys config
 tmsh save sys config gtm-only
 ```
