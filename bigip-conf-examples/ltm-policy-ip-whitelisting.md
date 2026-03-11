@@ -1,4 +1,8 @@
-## Datagroup of rfc1918 addresses:
+# Example of using a data-group and LTM Policy to drop traffic.
+
+## Datagroup of rfc1918 addresses
+
+```
 ltm data-group internal rfc1918 {
     records {
         10.0.0.0/8 { }
@@ -7,8 +11,11 @@ ltm data-group internal rfc1918 {
     }
     type ip
 }
+```
 
-## LTM Policy that drops any connection that doesn't come from an RFC1918 address:
+## LTM Policy that drops any connection that doesn't come from an RFC1918 address
+
+```
 ltm policy drop-non-internal {
     requires { tcp }
     rules {
@@ -35,3 +42,4 @@ ltm policy drop-non-internal {
     status published
     strategy first-match
 }
+```
