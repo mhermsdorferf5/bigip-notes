@@ -15,7 +15,7 @@
 * If config autosync is a must, then change the AS3 setting asyncTaskStorage to memory.
   * See: [AS3 Settings Endpoint Docs](https://clouddocs.f5.com/products/extensions/f5-appsvcs-extension/latest/userguide/settings-endpoint.html)
   * BIG-IP Config autosync is always synchronize replication, which is a problem from a performance standpoint.  Changing asyncTaskStorage from data-group to memory will lower the number of config changes while AS3 is working to deploy config in autosync mode and improve performance a little.
-  * The downside of setting asyncTaskStorage to memory is that the work queue won’t be retained on reboot, so if you reboot in the middle of an AS3 deploy it won’t resume the task when it comes back up.  AS3 Decleration history is still retained in data-groups.
+  * The downside of setting asyncTaskStorage to memory is that the work queue won’t be retained on reboot, so if you reboot in the middle of an AS3 deploy it won’t resume the task when it comes back up.  AS3 Declaration history is still retained in data-groups.
 * Use a local admin account or token auth.
 * Use BIG-IP 17.1.x or later.
 * Do not crank the timeouts up beyond about 120-180 seconds above, this will only delay/cascade any problems.
@@ -27,29 +27,29 @@ Just as a reference, internal testing has shown that if you’re run 17.1.x, app
 * Note this requires an additional 3.5g of ram for the control plane.
 
 ```bash
-tmsh modify /sys db provision.extramb value 1638
-tmsh modify /sys db provision.restjavad.extramb value 2022
+tmsh modify /sys db provision.extramb value 3072
+tmsh modify /sys db provision.restjavad.extramb value 2048
+tmsh modify /sys db provision.tomcat.extramb value 260
 tmsh modify /sys db restnoded.timeout value 180
 tmsh modify /sys db restjavad.timeout value 180
 tmsh modify /sys db icrd.timeout value 180
 tmsh modify /sys db iapplxrpm.timeout value 300
 tmsh save sys config
-tmsh restart sys service restjavad tomcat restnoded
 ```
 
 ## Recommended starting memory and timeout settings for smaller configs
 
-* If you don't have the additional 3.5g of RAM to spare, and do not have terribly large configurations, consider these.
+* If you don't have the additional 3.5g of RAM to spare, and do not have terribly large configurations, consider these.  You can go even smaller if memory is limited and your needs are not great.
 
 ```bash
-tmsh modify /sys db provision.extramb value 1024
+tmsh modify /sys db provision.extramb value 2048
 tmsh modify /sys db provision.restjavad.extramb value 1024
+tmsh modify /sys db provision.tomcat.extramb value 130
 tmsh modify /sys db restnoded.timeout value 180
 tmsh modify /sys db restjavad.timeout value 180
 tmsh modify /sys db icrd.timeout value 180
 tmsh modify /sys db iapplxrpm.timeout value 300
 tmsh save sys config
-tmsh restart sys service restjavad tomcat restnoded
 ```
 
 ## Additional Supporting KB Articles
