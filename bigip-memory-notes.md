@@ -81,7 +81,7 @@ This is used in computing the maximum blob size, but the documentation is very w
 
 I create a memory analysis tool that can provide some rather useful parsing of /proc/memstat and looks at the various processes to see what processes are using HugePages and how much HugePages vs. non-HugePages they use.  This can be helpful in both understanding what's going on and in figuring out how to tweak your memory provisioning settings optimally.
 
-You can find the script here: [bigip-memory-tool.py](bigip-memory-tool.py)
+You can find the script here: [misc-scripts/bigip-memory-tool.py](bigip-memory-tool.py)
 
 An example of it being used on a big-ip:
 
