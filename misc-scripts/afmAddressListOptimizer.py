@@ -166,23 +166,37 @@ def analyze_address_list(networks: list) -> dict | None:
 # Formatting
 # ---------------------------------------------------------------------------
 
+def _pct(saved: int, original: int) -> str:
+    """Format a savings percentage string."""
+    if original == 0:
+        return "0.0%"
+    return f"{saved / original * 100:.1f}%"
+
+
 def format_summary(name: str, source: Path, result: dict) -> str:
+    orig = len(result['original'])
+    opt  = len(result['optimized'])
+    saved = result['saved']
     lines = []
     lines.append(f"\n{'='*70}")
     lines.append(f"Address List : {name}")
     lines.append(f"Source       : {source}")
-    lines.append(f"Original     : {len(result['original'])} entries")
-    lines.append(f"Optimized    : {len(result['optimized'])} entries  (saves {result['saved']})")
+    lines.append(f"Original     : {orig} entries")
+    lines.append(f"Optimized    : {opt} entries  (saves {saved}, {_pct(saved, orig)} reduction)")
 
     return "\n".join(lines)
 
+
 def format_report(name: str, source: Path, result: dict) -> str:
+    orig  = len(result['original'])
+    opt   = len(result['optimized'])
+    saved = result['saved']
     lines = []
     lines.append(f"\n{'='*70}")
     lines.append(f"Address List : {name}")
     lines.append(f"Source       : {source}")
-    lines.append(f"Original     : {len(result['original'])} entries")
-    lines.append(f"Optimized    : {len(result['optimized'])} entries  (saves {result['saved']})")
+    lines.append(f"Original     : {orig} entries")
+    lines.append(f"Optimized    : {opt} entries  (saves {saved}, {_pct(saved, orig)} reduction)")
 
     if result["overlaps"]:
         lines.append(f"\n  Overlapping entries ({len(result['overlaps'])} found):")
@@ -248,7 +262,10 @@ def main():
     optimized_stanzas = []
     total_lists = 0
     total_optimized = 0
-    total_saved = 0
+    total_addresses_original = 0
+    total_addresses_optimized = 0
+    grand_total_original = 0
+    grand_total_optimized = 0
 
     for config_file in config_files:
         address_lists = extract_address_lists(config_file)
@@ -262,7 +279,10 @@ def main():
             result = analyze_address_list(networks)
             if result:
                 total_optimized += 1
-                total_saved += result["saved"]
+                total_addresses_original  += len(result["original"])
+                total_addresses_optimized += len(result["optimized"])
+                grand_total_original  += len(result["original"])
+                grand_total_optimized += len(result["optimized"])
                 report_sections.append(format_report(name, config_file, result))
                 summary_sections.append(format_summary(name, config_file, result))
                 optimized_stanzas.append(
@@ -270,16 +290,28 @@ def main():
                     + format_optimized_stanza(name, result["optimized"])
                 )
             else:
+                grand_total_original  += len(networks)
+                grand_total_optimized += len(networks)
                 optimized_stanzas.append(
                     f"# Unchanged from {config_file}\n"
                     + format_optimized_stanza(name, networks)
                 )
 
+    total_saved = total_addresses_original - total_addresses_optimized
+    grand_total_saved = grand_total_original - grand_total_optimized
     summary = (
         f"\n"
         f"\n{'='*70}"
         f"\nSummary: scanned {total_lists} address list(s) across {len(config_files)} file(s)."
-        f"\n         {total_optimized} list(s) can be optimized, saving {total_saved} total entries."
+        f"\n         {total_optimized} list(s) can be optimized."
+        f"\n"
+        f"\n  Total addresses (all lists):"
+        f"\n    Original  : {grand_total_original}"
+        f"\n    Optimized : {grand_total_optimized}  (saves {grand_total_saved}, {_pct(grand_total_saved, grand_total_original)} reduction)"
+        f"\n"
+        f"\n  Total addresses (optimizable lists only):"
+        f"\n    Original  : {total_addresses_original}"
+        f"\n    Optimized : {total_addresses_optimized}  (saves {total_saved}, {_pct(total_saved, total_addresses_original)} reduction)"
         f"\n{'='*70}"
     )
     summary += "".join(summary_sections) + "\n"
