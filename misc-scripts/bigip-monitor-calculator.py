@@ -11,7 +11,7 @@ Usage:
     python bigip-monitor-caculator.py <bigip.conf>
     
 If you have partitions, you can create a merged bigip.conf file using the following:
-find /config/ -iname "bigip.conf" -not -ipath "*.bak*" -not -ipath "*.diffVer*" -exec cat {} \; > /var/tmp/merged-bigip.conf
+find /config/ -iname "bigip.conf" -not -ipath "*.bak*" -not -ipath "*.diffVer*" -exec cat {} \\; > /var/tmp/merged-bigip.conf
 """
 
 import re
